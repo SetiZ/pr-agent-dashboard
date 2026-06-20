@@ -7,6 +7,8 @@ import json
 import logging
 from contextlib import asynccontextmanager
 
+import bleach
+import markdown
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -290,7 +292,12 @@ async def repo_detail(repo: str):
         state_class = {"open": "state-open", "merged": "state-merged", "closed": "state-closed"}
         reviews_html = ""
         for r in pr["reviews"]:
-            body = html.escape(r["body"])
+            raw = markdown.markdown(r["body"], extensions=["fenced_code", "codehilite"])
+            body = bleach.clean(raw,
+                tags=["p","h1","h2","h3","h4","h5","h6","ul","ol","li",
+                      "pre","code","strong","em","a","blockquote","hr","br",
+                      "table","thead","tbody","tr","th","td","div","span"],
+                attributes={"a": ["href","target"]})
             date = r["created_at"][:10]
             reviews_html += f"""
             <details class='review-details'>
