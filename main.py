@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta
+from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day
 from models import MemoryRequest, CustomInstructions
 
 load_dotenv()
@@ -61,11 +61,17 @@ async def github_webhook(request: Request):
         pr_number = pr["number"]
         pr_title = pr["title"]
         action = payload.get("action", "")
-        if action in ("opened", "reopened", "synchronize"):
+        if action in ("opened", "reopened"):
+            upsert_pr(repo, pr_number, pr_title, "open")
             store_review(repo=repo, pr_number=pr_number, pr_title=pr_title,
                          body=f"### PR #{pr_number}: {pr_title}\n\n*Review en attente...*",
                          author=pr["user"]["login"], comment_id=None)
             log.info("Tracked PR #%s in %s", pr_number, repo)
+        elif action == "closed":
+            merged = pr.get("merged", False)
+            state = "merged" if merged else "closed"
+            upsert_pr(repo, pr_number, pr_title, state)
+            log.info("PR #%s in %s → %s", pr_number, repo, state)
 
     elif event == "issue_comment" and payload.get("comment"):
         issue = payload.get("issue", {})
@@ -132,12 +138,24 @@ async def stats(days: int = Query(30, ge=1, le=365)):
     return get_stats(days)
 
 
+@app.get("/api/timeline")
+async def timeline(days: int = Query(30, ge=1, le=365)):
+    return get_reviews_by_day(days)
+
+
+@app.get("/api/repo/{repo:path}/prs")
+async def repo_prs(repo: str):
+    data = get_prs_with_reviews(repo)
+    return {"repo": repo, "prs": data}
+
+
 STYLES = """
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:2rem;max-width:1200px;margin:0 auto;}
 h1{color:#58a6ff;margin-bottom:1.5rem;font-size:1.8rem;}
 h2{color:#f0f6fc;margin:1.5rem 0 0.75rem;font-size:1.3rem;}
+h3{color:#f0f6fc;margin:1rem 0 0.5rem;font-size:1.1rem;}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;}
 .stat-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.2rem;text-align:center;}
 .stat-value{font-size:2rem;font-weight:700;color:#58a6ff;}
@@ -153,6 +171,24 @@ tr:hover td{background:#1c2128;}
 .pr-link:hover{color:#58a6ff;}
 .preview{color:#8b949e;font-size:0.85rem;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .footer{margin-top:2rem;text-align:center;color:#484f58;font-size:0.8rem;}
+.back-link{display:inline-block;margin-bottom:1rem;color:#8b949e;text-decoration:none;font-size:0.9rem;}
+.back-link:hover{color:#58a6ff;}
+.state-open{color:#3fb950;font-size:0.75rem;padding:0.15rem 0.5rem;border:1px solid #3fb95055;border-radius:12px;}
+.state-merged{color:#d2a8ff;font-size:0.75rem;padding:0.15rem 0.5rem;border:1px solid #d2a8ff55;border-radius:12px;}
+.state-closed{color:#f85149;font-size:0.75rem;padding:0.15rem 0.5rem;border:1px solid #f8514955;border-radius:12px;}
+.detail-btn{background:none;border:none;color:#58a6ff;cursor:pointer;font-size:0.85rem;}
+.detail-btn:hover{text-decoration:underline;}
+details.review-details{background:#161b22;border:1px solid #30363d;border-radius:6px;margin:0.5rem 0;padding:0.5rem 1rem;}
+details.review-details summary{cursor:pointer;color:#c9d1d9;padding:0.3rem 0;}
+details.review-details .body{color:#c9d1d9;font-size:0.85rem;line-height:1.5;padding:0.5rem 0;white-space:pre-wrap;}
+.timeline{display:flex;align-items:end;gap:2px;height:100px;padding:0.5rem 0;margin-bottom:1.5rem;}
+.timeline-bar{flex:1;background:#1f6feb;border-radius:2px 2px 0 0;min-width:4px;position:relative;transition:background 0.2s;}
+.timeline-bar:hover{background:#58a6ff;}
+.timeline-bar .tooltip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#1c2128;color:#c9d1d9;padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;white-space:nowrap;z-index:10;border:1px solid #30363d;}
+.timeline-bar:hover .tooltip{display:block;}
+.timeline-empty{color:#484f58;text-align:center;padding:1rem;}
+.section-label{display:flex;align-items:center;gap:0.5rem;margin:1.5rem 0 0.75rem;}
+.section-label .count{color:#8b949e;font-size:0.85rem;}
 </style>
 """
 
@@ -161,10 +197,20 @@ tr:hover td{background:#1c2128;}
 async def dashboard():
     s = get_stats(30)
     recent = get_reviews(limit=20)
+    timeline_data = get_reviews_by_day(30)
+
+    repos = {}
+    for r in recent:
+        repo = r["repo"]
+        if repo not in repos:
+            repos[repo] = {"reviews": [], "prs": set()}
+        repos[repo]["reviews"].append(r)
+        repos[repo]["prs"].add(r["pr_number"])
+
     rows = ""
     for r in recent:
         preview = r["body"][:120].replace("\n", " ").strip() if r["body"] else ""
-        rows += f"<tr><td><a class='repo-link' href='/?repo={r['repo']}'>{r['repo']}</a></td>"
+        rows += f"<tr><td><a class='repo-link' href='/repo/{r['repo']}'>{r['repo']}</a></td>"
         rows += f"<td><a class='pr-link' href='https://github.com/{r['repo']}/pull/{r['pr_number']}' target='_blank'>#{r['pr_number']}</a></td>"
         rows += f"<td><div class='preview'>{preview}</div></td>"
         rows += f"<td><span class='badge'>{r['suggestions_count']}</span></td>"
@@ -172,6 +218,28 @@ async def dashboard():
 
     if not rows:
         rows = "<tr><td colspan='5' style='text-align:center;color:#484f58;padding:2rem;'>Aucune review pour l'instant. Configure le webhook GitHub.</td></tr>"
+
+    repo_cards = ""
+    for repo, info in sorted(repos.items()):
+        pr_count = len(info["prs"])
+        rev_count = len(info["reviews"])
+        repo_cards += f"""
+        <a href='/repo/{repo}' style='text-decoration:none;'>
+        <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;'>
+            <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo}</span>
+            <span class='badge'>{pr_count} PRs</span>
+            <span class='badge'>{rev_count} reviews</span>
+        </div>
+        </a>"""
+
+    timeline_bars = ""
+    if timeline_data:
+        max_count = max(d["count"] for d in timeline_data) or 1
+        for d in timeline_data:
+            h = max(3, int(d["count"] / max_count * 90))
+            timeline_bars += f"<div class='timeline-bar' style='height:{h}px'><span class='tooltip'>{d['date']}: {d['count']}</span></div>"
+    else:
+        timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><title>PR-Agent Dashboard</title>{STYLES}</head>
@@ -185,9 +253,95 @@ async def dashboard():
 <div class="stat-card"><div class="stat-value">{s['avg_suggestions']:.1f}</div><div class="stat-label">Suggestions/review</div></div>
 <div class="stat-card"><div class="stat-value">{s['reviews_per_day']:.1f}</div><div class="stat-label">Reviews/jour</div></div>
 </div>
+<h2>📈 Activité (30 jours)</h2>
+<div class="timeline">{timeline_bars}</div>
+<h2>📂 Dépôts actifs</h2>
+<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem;">{repo_cards}</div>
 <h2>Dernières reviews</h2>
 <table><thead><tr><th>Repo</th><th>PR</th><th>Aperçu</th><th>Suggestions</th><th>Date</th></tr></thead><tbody>{rows}</tbody></table>
 <div class="footer">PR-Agent Dashboard v0.1 · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
+</body></html>""")
+
+
+@app.get("/repo/{repo:path}", response_class=HTMLResponse)
+async def repo_detail(repo: str):
+    data = get_prs_with_reviews(repo)
+    timeline_data = get_reviews_by_day(30)
+
+    total_reviews = sum(len(pr["reviews"]) for pr in data)
+    open_prs = sum(1 for pr in data if pr["state"] == "open")
+    merged_prs = sum(1 for pr in data if pr["state"] == "merged")
+    closed_prs = sum(1 for pr in data if pr["state"] == "closed")
+
+    timeline_bars = ""
+    if timeline_data:
+        max_count = max(d["count"] for d in timeline_data) or 1
+        for d in timeline_data:
+            h = max(3, int(d["count"] / max_count * 90))
+            timeline_bars += f"<div class='timeline-bar' style='height:{h}px'><span class='tooltip'>{d['date']}: {d['count']}</span></div>"
+    else:
+        timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
+
+    pr_sections = {"open": "", "merged": "", "closed": ""}
+    for pr in data:
+        state = pr["state"]
+        state_label = {"open": "🟢 open", "merged": "🟣 merged", "closed": "🔴 closed"}
+        state_class = {"open": "state-open", "merged": "state-merged", "closed": "state-closed"}
+        reviews_html = ""
+        for r in pr["reviews"]:
+            body = r["body"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            date = r["created_at"][:10]
+            reviews_html += f"""
+            <details class='review-details'>
+                <summary>Review #{r['id']} — {date} <span class='badge'>{r['suggestions_count']} suggestions</span></summary>
+                <div class='body'>{body}</div>
+            </details>"""
+        if not reviews_html:
+            reviews_html = "<p style='color:#8b949e;font-size:0.85rem;padding:0.5rem 0;'>Aucune review stockée.</p>"
+
+        pr_sections[state] += f"""
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1rem;margin-bottom:0.75rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                <a class="pr-link" href="https://github.com/{repo}/pull/{pr['pr_number']}" target="_blank" style="font-weight:600;">
+                    #{pr['pr_number']}
+                </a>
+                <span class="{state_class[state]}">{state_label[state]}</span>
+                <span style="color:#8b949e;font-size:0.85rem;flex:1;">{pr['pr_title'] or '(aucun titre)'}</span>
+                <span class='badge'>{len(pr['reviews'])} review(s)</span>
+            </div>
+            {reviews_html}
+        </div>"""
+
+    open_html = pr_sections.get("open", "")
+    merged_html = pr_sections.get("merged", "")
+    closed_html = pr_sections.get("closed", "")
+
+    sections = ""
+    if open_html:
+        sections += f"""<div class="section-label"><h2>🟡 Ouvertes</h2><span class="count">({open_prs})</span></div>{open_html}"""
+    if merged_html:
+        sections += f"""<div class="section-label"><h2>🟣 Fusionnées</h2><span class="count">({merged_prs})</span></div>{merged_html}"""
+    if closed_html:
+        sections += f"""<div class="section-label"><h2>🔴 Fermées</h2><span class="count">({closed_prs})</span></div>{closed_html}"""
+    if not sections:
+        sections = "<p style='color:#8b949e;text-align:center;padding:3rem;'>Aucun PR suivi pour ce dépôt.</p>"
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>{repo} — PR-Agent Dashboard</title>{STYLES}</head>
+<body>
+<a class="back-link" href="/">← Retour au dashboard</a>
+<h1>📂 {repo}</h1>
+<div class="stats-grid">
+<div class="stat-card"><div class="stat-value">{len(data)}</div><div class="stat-label">PRs suivis</div></div>
+<div class="stat-card"><div class="stat-value">{open_prs}</div><div class="stat-label">Ouvertes</div></div>
+<div class="stat-card"><div class="stat-value">{merged_prs}</div><div class="stat-label">Fusionnées</div></div>
+<div class="stat-card"><div class="stat-value">{closed_prs}</div><div class="stat-label">Fermées</div></div>
+<div class="stat-card"><div class="stat-value">{total_reviews}</div><div class="stat-label">Reviews</div></div>
+</div>
+<h2>📈 Activité (30 jours)</h2>
+<div class="timeline">{timeline_bars}</div>
+{sections}
+<div class="footer">PR-Agent Dashboard · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
 </body></html>""")
 
 
