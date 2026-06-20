@@ -62,7 +62,7 @@ async def github_webhook(request: Request):
         pr_number = pr["number"]
         pr_title = pr["title"]
         action = payload.get("action", "")
-        if action in ("opened", "reopened", "synchronize"):
+        if action in ("opened", "reopened"):
             upsert_pr(repo, pr_number, pr_title, "open")
             store_review(repo=repo, pr_number=pr_number, pr_title=pr_title,
                          body=f"### PR #{pr_number}: {pr_title}\n\n*Review en attente...*",
@@ -85,8 +85,8 @@ async def github_webhook(request: Request):
         author = comment["user"]["login"]
         body_text = comment["body"]
         comment_id = comment["id"]
-        if author.lower() != PR_AGENT_BOT.lower():
-            return {"ok": True, "ignored": "not PR-Agent bot"}
+        if author.lower() not in ("pr-agent[bot]", "github-actions[bot]"):
+            return {"ok": True, "ignored": "not a known bot"}
         rid = store_review(repo=repo, pr_number=pr_number, pr_title=pr_title,
                            body=body_text, author=author, comment_id=comment_id)
         log.info("Stored review #%s from PR-Agent on PR #%s/%s", rid, pr_number, repo)
@@ -100,7 +100,7 @@ async def github_webhook(request: Request):
         author = review["user"]["login"]
         body_text = review.get("body", "")
         review_id_field = review.get("id")
-        if author.lower() == PR_AGENT_BOT.lower():
+        if author.lower() in ("pr-agent[bot]", "github-actions[bot]"):
             store_review(repo=repo, pr_number=pr_number, pr_title=pr_title,
                          body=body_text, author=author, comment_id=review_id_field)
             log.info("Stored PR review from PR-Agent on PR #%s/%s", pr_number, repo)
