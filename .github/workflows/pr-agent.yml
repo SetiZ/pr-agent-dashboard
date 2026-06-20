@@ -10,10 +10,17 @@ jobs:
       pull-requests: write
       contents: write
     steps:
+      - name: Get changed files
+        id: files
+        uses: jitterbit/get-changed-files@v1
+        with:
+          format: csv
+
       - name: Get memory context from dashboard
         id: memory
         run: |
-          RESPONSE=$(curl -s "https://ton-domaine-c…emory?repo=${{ github.repository }}&pr=${{ github.event.number }}")
+          FILES="${{ steps.files.outputs.all }}"
+          RESPONSE=$(curl -s "http://65.21.62.152:8000/memory?repo=${{ github.repository }}&pr=${{ github.event.number }}&files=$FILES")
           CONTEXT=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('context',''))")
           echo "context<<EOF" >> $GITHUB_OUTPUT
           echo "$CONTEXT" >> $GITHUB_OUTPUT
