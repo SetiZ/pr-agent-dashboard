@@ -20,6 +20,23 @@ GitHub Action (PR-Agent)
                               └─────────┘
 ```
 
+## PR Agent Commands
+
+These commands can be used as comments on any PR (with `issue_comment` trigger configured) or run automatically via the workflow:
+
+| Command | Description |
+|---------|-------------|
+| `/review` | Full PR review with feedback on code quality, security, and consistency |
+| `/describe` | Generates a PR title and description based on the changes |
+| `/improve` | Suggests specific code improvements with before/after examples |
+| `/ask "question"` | Ask any question about the PR |
+| `/add_docs` | Adds documentation docstrings to new/changed code |
+| `/generate_labels` | Suggests appropriate labels for the PR |
+| `/update_changelog` | Automatically updates CHANGELOG.md |
+| `/help` | Shows all available commands |
+
+The workflow on `main` currently has **auto_review**, **auto_describe**, and **auto_improve** enabled — they run automatically on every new PR without needing a comment.
+
 ## Fonctionnalités
 
 | Endpoint | Méthode | Description |
@@ -62,19 +79,33 @@ Crée (ou modifie) `.github/workflows/pr-agent.yml` :
 name: PR Agent with Memory
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
 
 jobs:
   pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      issues: write
       contents: write
     steps:
-      - name: Get memory context
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: files
+        uses: tj-actions/changed-files@v44
+        with:
+          separator: ","
+
+      - name: Get memory context from dashboard
         id: memory
         run: |
-          RESPONSE=$(curl -s "https://ton-domaine-c…emory?repo=${{ github.repository }}&pr=${{ github.event.number }}")
+          FILES="${{ steps.files.outputs.all_changed_files }}"
+          RESPONSE=$(curl -s "https://ton-domaine-c…emory?repo=${{ github.repository }}&pr=${{ github.event.number }}&files=$FILES")
           CONTEXT=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('context',''))")
           echo "context<<EOF" >> $GITHUB_OUTPUT
           echo "$CONTEXT" >> $GITHUB_OUTPUT
@@ -83,8 +114,16 @@ jobs:
       - uses: the-pr-agent/pr-agent@main
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI.API_BASE: "https://api.scaleway.ai/${{ secrets.SCALEWAY_PROJECT_ID }}/v1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          config.model: "openai/gemma-4-26b-a4b-it"
+          config.fallback_models: '["openai/gemma-4-26b-a4b-it"]'
+          config.custom_model_max_tokens: "32768"
+          pr_reviewer.model: "openai/gemma-4-26b-a4b-it"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
 ```
 
 ### 4. (Optionnel) Instructions personnalisées
