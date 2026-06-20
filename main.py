@@ -290,7 +290,7 @@ async def repo_detail(repo: str):
         state_class = {"open": "state-open", "merged": "state-merged", "closed": "state-closed"}
         reviews_html = ""
         for r in pr["reviews"]:
-            body = r["body"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            body = html.escape(r["body"])
             date = r["created_at"][:10]
             reviews_html += f"""
             <details class='review-details'>
