@@ -39,6 +39,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: "qwen3-coder-30b-a3b-instruct"
           config.fallback_models: '["qwen3-coder-30b-a3b-instruct"]'
+          config.custom_model_max_tokens: "32768"
           pr_reviewer.model: "qwen3-coder-30b-a3b-instruct"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
           github_action_config.auto_review: "true"
