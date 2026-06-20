@@ -37,10 +37,10 @@ jobs:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           OPENAI.API_BASE: "https://api.scaleway.ai/${{ secrets.SCALEWAY_PROJECT_ID }}/v1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          config.model: "qwen3-coder-30b-a3b-instruct"
-          config.fallback_models: '["qwen3-coder-30b-a3b-instruct"]'
+          config.model: "gemma-4-26b-a4b-it"
+          config.fallback_models: '["gemma-4-26b-a4b-it"]'
           config.custom_model_max_tokens: "32768"
-          pr_reviewer.model: "qwen3-coder-30b-a3b-instruct"
+          pr_reviewer.model: "gemma-4-26b-a4b-it"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
