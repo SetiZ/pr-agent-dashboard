@@ -43,6 +43,15 @@ def init_db():
                 summary     TEXT    DEFAULT ''
             );
 
+            CREATE TABLE IF NOT EXISTS prs (
+                repo        TEXT    NOT NULL,
+                pr_number   INTEGER NOT NULL,
+                pr_title    TEXT    DEFAULT '',
+                state       TEXT    DEFAULT 'open',
+                updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (repo, pr_number)
+            );
+
             CREATE TABLE IF NOT EXISTS meta (
                 repo        TEXT    NOT NULL,
                 key         TEXT    NOT NULL,
@@ -57,6 +66,8 @@ def init_db():
                 ON reviews(created_at);
             CREATE INDEX IF NOT EXISTS idx_suggestions_review
                 ON suggestions(review_id);
+            CREATE INDEX IF NOT EXISTS idx_prs_state
+                ON prs(state);
         """)
 
 
@@ -82,6 +93,52 @@ def store_review(
             (repo, pr_number, pr_title, comment_id, author, body, suggestions_count),
         )
         return cur.lastrowid
+
+
+def upsert_pr(repo: str, pr_number: int, pr_title: str, state: str = "open"):
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO prs (repo, pr_number, pr_title, state, updated_at)
+               VALUES (?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(repo, pr_number) DO UPDATE SET
+                   state = excluded.state,
+                   pr_title = excluded.pr_title,
+                   updated_at = datetime('now')""",
+            (repo, pr_number, pr_title, state),
+        )
+
+
+def get_prs_with_reviews(repo: str) -> list[dict]:
+    with get_connection() as conn:
+        prs = conn.execute(
+            """SELECT repo, pr_number, pr_title, state
+               FROM prs
+               WHERE repo = ?
+               ORDER BY pr_number DESC""",
+            (repo,),
+        ).fetchall()
+
+        result = []
+        for pr in prs:
+            reviews = conn.execute(
+                "SELECT * FROM reviews WHERE repo = ? AND pr_number = ? ORDER BY created_at DESC",
+                (repo, pr["pr_number"]),
+            ).fetchall()
+            result.append({**dict(pr), "reviews": [dict(r) for r in reviews]})
+        return result
+
+
+def get_reviews_by_day(days: int = 30) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT DATE(created_at) AS date, COUNT(*) AS count
+               FROM reviews
+               WHERE created_at >= datetime('now', ? || ' days')
+               GROUP BY DATE(created_at)
+               ORDER BY date ASC""",
+            (f"-{days}",),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_reviews(repo: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
