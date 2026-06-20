@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+
+# Environnement
+.env
+.venv/
+venv/
+
+# Base de données
+pr_agent.db*
+pr_agent.db-shm
+pr_agent.db-wal
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
