@@ -1,18 +1,19 @@
 name: PR Agent with Memory
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   pr_agent_job:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      issues: write
       contents: write
     steps:
       - name: Get changed files
         id: files
-        uses: jitterbit/get-changed-files@v1
+        uses: jitterbit/get-changed-files@v2
         with:
           format: csv
 
@@ -28,6 +29,8 @@ jobs:
 
       - uses: the-pr-agent/pr-agent@main
         env:
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+          OPENAI.API_BASE: "https://api.scaleway.ai/v1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pr_reviewer.model: "qwen3-coder-30b-a3b-instruct"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
