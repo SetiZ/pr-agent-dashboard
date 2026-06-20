@@ -42,6 +42,7 @@ jobs:
           config.custom_model_max_tokens: "32768"
           pr_reviewer.model: "openai/gemma-4-26b-a4b-it"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
+          github_action_config.pr_actions: '["opened","reopened","ready_for_review","synchronize"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
           github_action_config.auto_improve: "true"
