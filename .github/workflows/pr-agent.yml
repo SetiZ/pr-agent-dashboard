@@ -2,9 +2,11 @@ name: PR Agent with Memory
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
 
 jobs:
   pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -30,7 +32,7 @@ jobs:
       - uses: the-pr-agent/pr-agent@main
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          OPENAI.API_BASE: "https://api.scaleway.ai/v1"
+          OPENAI.API_BASE: "https://api.scaleway.ai/${{ secrets.SCALEWAY_PROJECT_ID }}/v1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: "qwen3-coder-30b-a3b-instruct"
           config.fallback_models: '["qwen3-coder-30b-a3b-instruct"]'
