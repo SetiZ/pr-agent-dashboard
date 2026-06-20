@@ -41,3 +41,6 @@ jobs:
           config.fallback_models: '["qwen3-coder-30b-a3b-instruct"]'
           pr_reviewer.model: "qwen3-coder-30b-a3b-instruct"
           pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
