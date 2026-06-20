@@ -118,13 +118,18 @@ def get_prs_with_reviews(repo: str) -> list[dict]:
             (repo,),
         ).fetchall()
 
+        all_reviews = conn.execute(
+            "SELECT * FROM reviews WHERE repo = ? ORDER BY created_at DESC", (repo,)
+        ).fetchall()
+        review_map = {}
+        for r in all_reviews:
+            review_map.setdefault(r["pr_number"], []).append(dict(r))
+
         result = []
         for pr in prs:
-            reviews = conn.execute(
-                "SELECT * FROM reviews WHERE repo = ? AND pr_number = ? ORDER BY created_at DESC",
-                (repo, pr["pr_number"]),
-            ).fetchall()
-            result.append({**dict(pr), "reviews": [dict(r) for r in reviews]})
+            pr_dict = dict(pr)
+            pr_dict["reviews"] = review_map.get(pr_dict["pr_number"], [])
+            result.append(pr_dict)
         return result
 
 

@@ -2,6 +2,7 @@
 import os
 import hashlib
 import hmac
+import html
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -61,7 +62,7 @@ async def github_webhook(request: Request):
         pr_number = pr["number"]
         pr_title = pr["title"]
         action = payload.get("action", "")
-        if action in ("opened", "reopened"):
+        if action in ("opened", "reopened", "synchronize"):
             upsert_pr(repo, pr_number, pr_title, "open")
             store_review(repo=repo, pr_number=pr_number, pr_title=pr_title,
                          body=f"### PR #{pr_number}: {pr_title}\n\n*Review en attente...*",
@@ -209,7 +210,7 @@ async def dashboard():
 
     rows = ""
     for r in recent:
-        preview = r["body"][:120].replace("\n", " ").strip() if r["body"] else ""
+        preview = html.escape(r["body"][:120].replace("\n", " ").strip()) if r["body"] else ""
         rows += f"<tr><td><a class='repo-link' href='/repo/{r['repo']}'>{r['repo']}</a></td>"
         rows += f"<td><a class='pr-link' href='https://github.com/{r['repo']}/pull/{r['pr_number']}' target='_blank'>#{r['pr_number']}</a></td>"
         rows += f"<td><div class='preview'>{preview}</div></td>"
@@ -306,7 +307,7 @@ async def repo_detail(repo: str):
                     #{pr['pr_number']}
                 </a>
                 <span class="{state_class[state]}">{state_label[state]}</span>
-                <span style="color:#8b949e;font-size:0.85rem;flex:1;">{pr['pr_title'] or '(aucun titre)'}</span>
+                <span style="color:#8b949e;font-size:0.85rem;flex:1;">{html.escape(pr['pr_title'] or '(aucun titre)')}</span>
                 <span class='badge'>{len(pr['reviews'])} review(s)</span>
             </div>
             {reviews_html}
