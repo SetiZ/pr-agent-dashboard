@@ -162,22 +162,48 @@ def get_reviews(repo: str | None = None, limit: int = 50, offset: int = 0) -> li
         return [dict(r) for r in rows]
 
 
-def get_stats(days: int = 30) -> dict:
-    """Statistiques globales sur les N derniers jours."""
+def get_stats(days: int | None = 30) -> dict:
+    """Statistiques globales. Si days=None, toutes les reviews."""
+    with get_connection() as conn:
+        if days is not None:
+            rows = conn.execute(
+                """SELECT
+                       COUNT(*)                                  AS total_reviews,
+                       COUNT(DISTINCT repo)                      AS repos,
+                       COUNT(DISTINCT pr_number)                 AS prs,
+                       IFNULL(SUM(suggestions_count), 0)         AS total_suggestions,
+                       IFNULL(AVG(suggestions_count), 0.0)       AS avg_suggestions,
+                       IFNULL(COUNT(*) / CAST(? AS REAL), 0.0)   AS reviews_per_day
+                   FROM reviews
+                   WHERE created_at >= datetime('now', ? || ' days')""",
+                (days, f"-{days}"),
+            ).fetchone()
+        else:
+            rows = conn.execute(
+                """SELECT
+                       COUNT(*)                                  AS total_reviews,
+                       COUNT(DISTINCT repo)                      AS repos,
+                       COUNT(DISTINCT pr_number)                 AS prs,
+                       IFNULL(SUM(suggestions_count), 0)         AS total_suggestions,
+                       IFNULL(AVG(suggestions_count), 0.0)       AS avg_suggestions,
+                       0.0                                       AS reviews_per_day
+                   FROM reviews""",
+            ).fetchone()
+        return dict(rows)
+
+
+def get_all_repos_summary() -> list[dict]:
+    """Retourne tous les repos avec le nombre de PRs et de reviews."""
     with get_connection() as conn:
         rows = conn.execute(
-            """SELECT
-                   COUNT(*)                                  AS total_reviews,
-                   COUNT(DISTINCT repo)                      AS repos,
-                   COUNT(DISTINCT pr_number)                 AS prs,
-                   IFNULL(SUM(suggestions_count), 0)         AS total_suggestions,
-                   IFNULL(AVG(suggestions_count), 0.0)       AS avg_suggestions,
-                   IFNULL(COUNT(*) / CAST(? AS REAL), 0.0)   AS reviews_per_day
-               FROM reviews
-               WHERE created_at >= datetime('now', ? || ' days')""",
-            (days, f"-{days}"),
-        ).fetchone()
-        return dict(rows)
+            """SELECT repo,
+                       COUNT(DISTINCT pr_number) AS pr_count,
+                       COUNT(*)                  AS review_count
+                FROM reviews
+                GROUP BY repo
+                ORDER BY review_count DESC""",
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_memory_context(repo: str, files_changed: list[str]) -> str:
