@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
-from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, HTTPException, Query, Form
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day
 from models import MemoryRequest, CustomInstructions
@@ -313,6 +313,12 @@ async def dashboard():
 </body></html>""")
 
 
+@app.post("/repo/{repo:path}/instructions")
+async def update_instructions(repo: str, instructions: str = Form("")):
+    set_meta(repo, "review_instructions", instructions)
+    return RedirectResponse(url=f"/repo/{repo}", status_code=303)
+
+
 @app.get("/repo/{repo:path}", response_class=HTMLResponse)
 async def repo_detail(repo: str):
     data = get_prs_with_reviews(repo)
@@ -322,6 +328,7 @@ async def repo_detail(repo: str):
     open_prs = sum(1 for pr in data if pr["state"] == "open")
     merged_prs = sum(1 for pr in data if pr["state"] == "merged")
     closed_prs = sum(1 for pr in data if pr["state"] == "closed")
+    current_instructions = get_meta(repo, "review_instructions") or ""
 
     timeline_bars = ""
     if timeline_data:
@@ -396,6 +403,11 @@ async def repo_detail(repo: str):
 </div>
 <h2>📈 Activité (30 jours)</h2>
 <div class="timeline">{timeline_bars}</div>
+<h2>Instructions personnalisées</h2>
+<form method="POST" action="/repo/{repo}/instructions" style="margin-bottom:1.5rem;">
+    <textarea name="instructions" rows="4" style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:0.75rem;font-family:inherit;font-size:0.85rem;resize:vertical;">{html.escape(current_instructions)}</textarea>
+    <button type="submit" style="margin-top:0.5rem;background:#1f6feb;color:#fff;border:none;border-radius:6px;padding:0.5rem 1rem;font-size:0.85rem;cursor:pointer;">Enregistrer</button>
+</form>
 {sections}
 <div class="footer">PR-Agent Dashboard · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
 </body></html>""")
