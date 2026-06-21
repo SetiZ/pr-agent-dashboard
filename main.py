@@ -171,6 +171,44 @@ class _HighlightRenderer(mistune.HTMLRenderer):
 
 mistune_md = mistune.create_markdown(renderer=_HighlightRenderer(escape=False))
 
+
+def render_timeline_svg(data: list[dict], height: int = 100) -> str:
+    if not data:
+        return "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
+    max_count = max(d["count"] for d in data) or 1
+    n = len(data)
+    bar_w = max(10, min(28, 760 // n))
+    gap = 2
+    left = 36
+    svg_w = left + n * (bar_w + gap) + 4
+    svg_h = height + 24
+    y_scale = height / max_count
+
+    bars = ""
+    for i, d in enumerate(data):
+        bh = int(d["count"] * y_scale)
+        x = left + i * (bar_w + gap)
+        y = height - bh
+        bars += f'<rect x="{x}" y="{y}" width="{bar_w}" height="{bh}" fill="#1f6feb" rx="2"><title>{d["date"]}: {d["count"]} review(s)</title></rect>'
+
+    labels = ""
+    step = max(1, n // 6)
+    for i, d in enumerate(data):
+        if i % step == 0:
+            x = left + i * (bar_w + gap) + bar_w // 2
+            labels += f'<text x="{x}" y="{height + 16}" fill="#8b949e" font-size="9" text-anchor="middle">{d["date"][5:]}</text>'
+
+    grid = ""
+    for val, y in [(max_count, 0), (max_count // 2, height // 2), (0, height)]:
+        grid += f'<text x="{left - 4}" y="{y + 4}" fill="#8b949e" font-size="9" text-anchor="end">{val}</text>'
+        grid += f'<line x1="{left}" y1="{y + 1}" x2="{svg_w - 4}" y2="{y + 1}" stroke="#30363d" stroke-width="{0.5 if val else 1}"/>'
+
+    return f'''<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;background:#161b22;border-radius:8px;margin-bottom:0.5rem;">
+  <g transform="translate(0,1)">{grid}{bars}</g>{labels}
+</svg>'''
+
+
+
 STYLES = """
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -209,11 +247,6 @@ details.review-details .body details{background:#0d1117;border:1px solid #30363d
 details.review-details .body details summary{cursor:pointer;color:#58a6ff;font-weight:600;}
 details.review-details .body table{display:block;overflow-x:auto;max-width:100%;}
 details.review-details .body .highlight{background:#272822;border-radius:6px;padding:0.75rem;overflow-x:auto;}
-.timeline{display:flex;align-items:end;gap:2px;height:100px;padding:0.5rem 0;margin-bottom:1.5rem;}
-.timeline-bar{flex:1;background:#1f6feb;border-radius:2px 2px 0 0;min-width:4px;position:relative;transition:background 0.2s;}
-.timeline-bar:hover{background:#58a6ff;}
-.timeline-bar .tooltip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#1c2128;color:#c9d1d9;padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;white-space:nowrap;z-index:10;border:1px solid #30363d;}
-.timeline-bar:hover .tooltip{display:block;}
 .timeline-empty{color:#484f58;text-align:center;padding:1rem;}
 .section-label{display:flex;align-items:center;gap:0.5rem;margin:1.5rem 0 0.75rem;}
 .section-label .count{color:#8b949e;font-size:0.85rem;}
@@ -262,14 +295,7 @@ async def dashboard():
         </div>
         </a>"""
 
-    timeline_bars = ""
-    if timeline_data:
-        max_count = max(d["count"] for d in timeline_data) or 1
-        for d in timeline_data:
-            h = max(3, int(d["count"] / max_count * 90))
-            timeline_bars += f"<div class='timeline-bar' style='height:{h}px'><span class='tooltip'>{d['date']}: {d['count']}</span></div>"
-    else:
-        timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
+    timeline_bars = render_timeline_svg(timeline_data)
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><title>PR-Agent Dashboard</title>{FULL_STYLES}</head>
@@ -284,7 +310,7 @@ async def dashboard():
 <div class="stat-card"><div class="stat-value">{s['reviews_per_day']:.1f}</div><div class="stat-label">Reviews/jour</div></div>
 </div>
 <h2>📈 Activité (30 jours)</h2>
-<div class="timeline">{timeline_bars}</div>
+{timeline_bars}
 <h2>📂 Dépôts actifs</h2>
 <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem;">{repo_cards}</div>
 <h2>Dernières reviews</h2>
@@ -303,14 +329,7 @@ async def repo_detail(repo: str):
     merged_prs = sum(1 for pr in data if pr["state"] == "merged")
     closed_prs = sum(1 for pr in data if pr["state"] == "closed")
 
-    timeline_bars = ""
-    if timeline_data:
-        max_count = max(d["count"] for d in timeline_data) or 1
-        for d in timeline_data:
-            h = max(3, int(d["count"] / max_count * 90))
-            timeline_bars += f"<div class='timeline-bar' style='height:{h}px'><span class='tooltip'>{d['date']}: {d['count']}</span></div>"
-    else:
-        timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
+    timeline_bars = render_timeline_svg(timeline_data)
 
     pr_sections = {"open": "", "merged": "", "closed": ""}
     for pr in data:
@@ -375,7 +394,7 @@ async def repo_detail(repo: str):
 <div class="stat-card"><div class="stat-value">{total_reviews}</div><div class="stat-label">Reviews</div></div>
 </div>
 <h2>📈 Activité (30 jours)</h2>
-<div class="timeline">{timeline_bars}</div>
+{timeline_bars}
 {sections}
 <div class="footer">PR-Agent Dashboard · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
 </body></html>""")
