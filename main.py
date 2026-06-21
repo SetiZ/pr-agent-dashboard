@@ -8,9 +8,11 @@ import logging
 from contextlib import asynccontextmanager
 
 import bleach
-import markdown
+import mistune
 from dotenv import load_dotenv
+from pygments import highlight
 from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -154,6 +156,20 @@ async def repo_prs(repo: str):
 
 
 PYGMENTS_CSS = HtmlFormatter(style="monokai").get_style_defs(".highlight")
+
+
+class _HighlightRenderer(mistune.HTMLRenderer):
+    def block_code(self, code: str, info: str | None = None) -> str:
+        if info:
+            try:
+                lexer = get_lexer_by_name(info, stripall=False)
+                return highlight(code, lexer, HtmlFormatter(style="monokai"))
+            except Exception:
+                pass
+        return f"<pre><code>{html.escape(code)}</code></pre>"
+
+
+mistune_md = mistune.create_markdown(renderer=_HighlightRenderer())
 
 STYLES = """
 <style>
@@ -303,8 +319,7 @@ async def repo_detail(repo: str):
         state_class = {"open": "state-open", "merged": "state-merged", "closed": "state-closed"}
         reviews_html = ""
         for r in pr["reviews"]:
-            body = r["body"].replace("</details>\n<details", "</details>\n\n<details")
-            raw = markdown.markdown(body, extensions=["fenced_code", "codehilite"])
+            raw = mistune_md(r["body"])
             body = bleach.clean(raw,
                 tags=["p","h1","h2","h3","h4","h5","h6","ul","ol","li",
                       "pre","code","strong","em","a","blockquote","hr","br",
