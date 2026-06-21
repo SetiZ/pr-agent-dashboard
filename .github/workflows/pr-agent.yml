@@ -1,4 +1,4 @@
-name: PR Agent with Memory
+name: PR Agent
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -17,20 +17,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get changed files
-        id: files
-        uses: tj-actions/changed-files@v44
-        with:
-          separator: ","
-
-      - uses: ./.github/actions/memory-context
-        id: memory
-        with:
-          dashboard-url: ${{ vars.DASHBOARD_URL }}
-          repo: ${{ github.repository }}
-          pr-number: ${{ github.event.number }}
-          files: ${{ steps.files.outputs.all_changed_files }}
-
       - uses: the-pr-agent/pr-agent@main
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
@@ -39,7 +25,6 @@ jobs:
           config.model: ${{ vars.PR_AGENT_MODEL }}
           config.custom_model_max_tokens: ${{ vars.PR_AGENT_MAX_TOKENS }}
           pr_reviewer.model: ${{ vars.PR_AGENT_MODEL }}
-          pr_reviewer.extra_instructions: ${{ steps.memory.outputs.context }}
           pr_reviewer.persistent_comment: "false"
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"

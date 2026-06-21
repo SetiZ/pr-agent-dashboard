@@ -16,8 +16,8 @@ from pygments.lexers import get_lexer_by_name
 from fastapi import FastAPI, Request, HTTPException, Query, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day, get_all_repos_summary
-from models import MemoryRequest, CustomInstructions
+from database import init_db, store_review, get_reviews, get_stats, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day, get_all_repos_summary
+from models import CustomInstructions
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -113,19 +113,6 @@ async def github_webhook(request: Request):
     return {"ok": True}
 
 
-@app.get("/memory")
-async def get_memory(repo: str = Query(...), pr_number: int = Query(...),
-                     files: str = Query("")):
-    files_list = [f.strip() for f in files.split(",") if f.strip()]
-    context = get_memory_context(repo, files_list)
-    if not context:
-        return {"context": ""}
-    custom = get_meta(repo, "review_instructions")
-    if custom:
-        context += f"\n\nInstructions personnalisées pour ce repo :\n{custom}\n"
-    return {"context": context}
-
-
 @app.post("/memory/instructions")
 async def set_custom_instructions(instr: CustomInstructions):
     set_meta(instr.repo, "review_instructions", instr.instructions)
@@ -191,7 +178,6 @@ tr:hover td{background:#1c2128;}
 .repo-link:hover{text-decoration:underline;}
 .pr-link{color:#c9d1d9;text-decoration:none;}
 .pr-link:hover{color:#58a6ff;}
-.preview{color:#8b949e;font-size:0.85rem;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .footer{margin-top:2rem;text-align:center;color:#484f58;font-size:0.8rem;}
 .back-link{display:inline-block;margin-bottom:1rem;color:#8b949e;text-decoration:none;font-size:0.9rem;}
 .back-link:hover{color:#58a6ff;}
@@ -222,7 +208,6 @@ body{padding:1rem;}
 h1{font-size:1.4rem;}
 table{font-size:0.8rem;}
 th,td{padding:0.5rem;}
-.preview{display:none;}
 th:nth-child(3),td:nth-child(3){display:none;}
 th:nth-child(4),td:nth-child(4){display:none;}
 .repo-link{font-size:0.8rem;}
@@ -245,63 +230,29 @@ FULL_STYLES = STYLES.replace("</style>", f"\n{PYGMENTS_CSS}\n</style>")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    s = get_stats(None)
-    recent = get_reviews(limit=20)
-    timeline_data = get_reviews_by_day(30)
-
     repos = get_all_repos_summary()
 
-    rows = ""
-    for r in recent:
-        preview = html.escape(r["body"][:120].replace("\n", " ").strip()) if r["body"] else ""
-        rows += f"<tr><td><a class='repo-link' href='/repo/{r['repo']}'>{r['repo']}</a></td>"
-        rows += f"<td><a class='pr-link' href='https://github.com/{r['repo']}/pull/{r['pr_number']}' target='_blank'>#{r['pr_number']}</a></td>"
-        rows += f"<td><div class='preview'>{preview}</div></td>"
-        rows += f"<td><span class='badge'>{r['suggestions_count']}</span></td>"
-        rows += f"<td>{r['created_at'][:16]}</td></tr>"
-
-    if not rows:
-        rows = "<tr><td colspan='5' style='text-align:center;color:#484f58;padding:2rem;'>Aucune review pour l'instant. Configure le webhook GitHub.</td></tr>"
-
     repo_cards = ""
-    for repo_info in repos:
-        repo_cards += f"""
-        <a href='/repo/{repo_info['repo']}' style='text-decoration:none;'>
-        <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;'>
-            <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo_info['repo']}</span>
-            <span class='badge'>{repo_info['pr_count']} PRs</span>
-            <span class='badge'>{repo_info['review_count']} reviews</span>
-        </div>
-        </a>"""
-
-    timeline_bars = ""
-    if timeline_data:
-        max_count = max(d["count"] for d in timeline_data) or 1
-        for d in timeline_data:
-            h = max(3, int(d["count"] / max_count * 90))
-            timeline_bars += f"<div class='timeline-bar' style='height:{h}px'><span class='tooltip'>{d['date']}: {d['count']}</span></div>"
+    if repos:
+        for repo_info in repos:
+            repo_cards += f"""
+            <a href='/repo/{repo_info['repo']}' style='text-decoration:none;'>
+            <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;'>
+                <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo_info['repo']}</span>
+                <span class='badge'>{repo_info['pr_count']} PRs</span>
+                <span class='badge'>{repo_info['review_count']} reviews</span>
+            </div>
+            </a>"""
     else:
-        timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
+        repo_cards = "<p style='color:#484f58;text-align:center;padding:2rem;'>Aucune review pour l'instant. Configure le webhook GitHub.</p>"
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR-Agent Dashboard</title>{FULL_STYLES}</head>
 <body>
 <h1>📊 PR-Agent Dashboard</h1>
-<div class="stats-grid">
-<div class="stat-card"><div class="stat-value">{s['total_reviews']}</div><div class="stat-label">Reviews</div></div>
-<div class="stat-card"><div class="stat-value">{s['prs']}</div><div class="stat-label">PRs reviewées</div></div>
-<div class="stat-card"><div class="stat-value">{s['repos']}</div><div class="stat-label">Repos actifs</div></div>
-<div class="stat-card"><div class="stat-value">{s['total_suggestions']}</div><div class="stat-label">Suggestions émises</div></div>
-<div class="stat-card"><div class="stat-value">{s['avg_suggestions']:.1f}</div><div class="stat-label">Suggestions/review</div></div>
-<div class="stat-card"><div class="stat-value">{s['reviews_per_day']:.1f}</div><div class="stat-label">Reviews/jour</div></div>
-</div>
-<h2>📈 Activité (30 jours)</h2>
-<div class="timeline">{timeline_bars}</div>
-<h2>📂 Dépôts actifs</h2>
+<h2>📂 Dépôts</h2>
 <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem;">{repo_cards}</div>
-<h2>Dernières reviews</h2>
-<div style="overflow-x:auto"><table><thead><tr><th>Repo</th><th>PR</th><th>Aperçu</th><th>Suggestions</th><th>Date</th></tr></thead><tbody>{rows}</tbody></table></div>
-<div class="footer">PR-Agent Dashboard v0.1 · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
+<div class="footer">PR-Agent Dashboard · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
 </body></html>""")
 
 
