@@ -313,7 +313,7 @@ async def repo_detail(repo: str):
                       "pre","code","strong","em","a","blockquote","hr","br",
                       "table","thead","tbody","tr","th","td","div","span",
                       "details","summary"],
-                attributes={"a": ["href","target"]})
+                attributes={"a": ["href","target"], "*": ["class"]})
             date = r["created_at"][:10]
             reviews_html += f"""
             <details class='review-details'>
