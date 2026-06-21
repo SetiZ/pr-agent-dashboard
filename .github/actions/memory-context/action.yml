@@ -1,0 +1,30 @@
+name: "Get Memory Context"
+description: "Fetch memory context for a PR from the dashboard"
+inputs:
+  dashboard-url:
+    required: true
+    description: "Dashboard base URL"
+  repo:
+    required: true
+    description: "Repository full name (e.g. owner/repo)"
+  pr-number:
+    required: true
+    description: "Pull request number"
+  files:
+    required: true
+    description: "Comma-separated list of changed files"
+outputs:
+  context:
+    description: "Memory context string for PR agent extra_instructions"
+    value: ${{ steps.fetch.outputs.context }}
+runs:
+  using: "composite"
+  steps:
+    - id: fetch
+      shell: bash
+      run: |
+        RESPONSE=$(curl -s "${{ inputs.dashboard-url }}/memory?repo=${{ inputs.repo }}&pr=${{ inputs.pr-number }}&files=${{ inputs.files }}")
+        CONTEXT=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('context',''))")
+        echo "context<<EOF" >> $GITHUB_OUTPUT
+        echo "$CONTEXT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
