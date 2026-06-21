@@ -16,7 +16,7 @@ from pygments.lexers import get_lexer_by_name
 from fastapi import FastAPI, Request, HTTPException, Query, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day
+from database import init_db, store_review, get_reviews, get_stats, get_memory_context, get_meta, set_meta, upsert_pr, get_prs_with_reviews, get_reviews_by_day, get_all_repos_summary
 from models import MemoryRequest, CustomInstructions
 
 load_dotenv()
@@ -245,17 +245,11 @@ FULL_STYLES = STYLES.replace("</style>", f"\n{PYGMENTS_CSS}\n</style>")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    s = get_stats(30)
+    s = get_stats(None)
     recent = get_reviews(limit=20)
     timeline_data = get_reviews_by_day(30)
 
-    repos = {}
-    for r in recent:
-        repo = r["repo"]
-        if repo not in repos:
-            repos[repo] = {"reviews": [], "prs": set()}
-        repos[repo]["reviews"].append(r)
-        repos[repo]["prs"].add(r["pr_number"])
+    repos = get_all_repos_summary()
 
     rows = ""
     for r in recent:
@@ -270,15 +264,13 @@ async def dashboard():
         rows = "<tr><td colspan='5' style='text-align:center;color:#484f58;padding:2rem;'>Aucune review pour l'instant. Configure le webhook GitHub.</td></tr>"
 
     repo_cards = ""
-    for repo, info in sorted(repos.items()):
-        pr_count = len(info["prs"])
-        rev_count = len(info["reviews"])
+    for repo_info in repos:
         repo_cards += f"""
-        <a href='/repo/{repo}' style='text-decoration:none;'>
+        <a href='/repo/{repo_info['repo']}' style='text-decoration:none;'>
         <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;'>
-            <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo}</span>
-            <span class='badge'>{pr_count} PRs</span>
-            <span class='badge'>{rev_count} reviews</span>
+            <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo_info['repo']}</span>
+            <span class='badge'>{repo_info['pr_count']} PRs</span>
+            <span class='badge'>{repo_info['review_count']} reviews</span>
         </div>
         </a>"""
 
@@ -296,7 +288,7 @@ async def dashboard():
 <body>
 <h1>📊 PR-Agent Dashboard</h1>
 <div class="stats-grid">
-<div class="stat-card"><div class="stat-value">{s['total_reviews']}</div><div class="stat-label">Reviews (30j)</div></div>
+<div class="stat-card"><div class="stat-value">{s['total_reviews']}</div><div class="stat-label">Reviews</div></div>
 <div class="stat-card"><div class="stat-value">{s['prs']}</div><div class="stat-label">PRs reviewées</div></div>
 <div class="stat-card"><div class="stat-value">{s['repos']}</div><div class="stat-label">Repos actifs</div></div>
 <div class="stat-card"><div class="stat-value">{s['total_suggestions']}</div><div class="stat-label">Suggestions émises</div></div>
@@ -353,10 +345,9 @@ async def repo_detail(repo: str):
                       "table","thead","tbody","tr","th","td","div","span",
                       "details","summary"],
                 attributes={"a": ["href","target"], "*": ["class"]})
-            date = r["created_at"][:10]
             reviews_html += f"""
             <details class='review-details'>
-                <summary>Review #{r['id']} — {date} <span class='badge'>{r['suggestions_count']} suggestions</span></summary>
+                <summary>Review #{r['id']} — {r['created_at'][:16]} <span class='badge'>{r['suggestions_count']} suggestions</span></summary>
                 <div class='body'>{body}</div>
             </details>"""
         if not reviews_html:
