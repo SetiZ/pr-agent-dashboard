@@ -14,12 +14,6 @@ class WebhookPayload(BaseModel):
     sender: Optional[dict] = None
 
 
-class MemoryRequest(BaseModel):
-    repo: str
-    pr_number: int
-    files: list[str] = []
-
-
 class CustomInstructions(BaseModel):
     """Instructions de review personnalisées pour un repo."""
     repo: str

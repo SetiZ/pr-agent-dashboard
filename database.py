@@ -206,40 +206,6 @@ def get_all_repos_summary() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_memory_context(repo: str, files_changed: list[str]) -> str:
-    """Génère un contexte mémoire à partir des reviews passées sur le même repo.
-
-    Cherche les reviews qui mentionnent les fichiers changés et retourne
-    un résumé textuel injectable dans PR-Agent comme extra_instructions.
-    """
-    with get_connection() as conn:
-        rows = conn.execute(
-            """SELECT pr_number, body, created_at
-               FROM reviews
-               WHERE repo = ? AND suggestions_count > 0
-               ORDER BY created_at DESC
-               LIMIT 5""",
-            (repo,),
-        ).fetchall()
-
-    if not rows:
-        return ""
-
-    parts = [
-        "📚 **Mémoire des reviews passées (pour contexte) :**",
-        "",
-    ]
-    for r in rows:
-        date = r["created_at"][:10]
-        # On prend juste les premières lignes significatives de l'ancienne review
-        preview = "\n".join(r["body"].split("\n")[:8])
-        parts.append(f"--- PR #{r['pr_number']} ({date}) ---")
-        parts.append(preview)
-        parts.append("")
-
-    return "\n".join(parts)
-
-
 def set_meta(repo: str, key: str, value: str):
     """Stocke une métadonnée (ex: instructions de review personnalisées)."""
     with get_connection() as conn:
