@@ -177,10 +177,10 @@ def render_timeline_svg(data: list[dict], height: int = 100) -> str:
         return "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
     max_count = max(d["count"] for d in data) or 1
     n = len(data)
-    bar_w = max(14, min(40, 600 // n))
-    gap = 3
+    bar_w = max(10, min(28, 760 // n))
+    gap = 2
     left = 36
-    svg_w = max(300, left + n * (bar_w + gap) + 4)
+    svg_w = left + n * (bar_w + gap) + 4
     svg_h = height + 24
     y_scale = height / max_count
 
@@ -203,7 +203,7 @@ def render_timeline_svg(data: list[dict], height: int = 100) -> str:
         grid += f'<text x="{left - 4}" y="{y + 4}" fill="#8b949e" font-size="9" text-anchor="end">{val}</text>'
         grid += f'<line x1="{left}" y1="{y + 1}" x2="{svg_w - 4}" y2="{y + 1}" stroke="#30363d" stroke-width="{0.5 if val else 1}"/>'
 
-    return f'''<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;max-width:800px;display:block;background:#161b22;border-radius:8px;margin-bottom:0.5rem;">
+    return f'''<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;background:#161b22;border-radius:8px;margin-bottom:0.5rem;">
   <g transform="translate(0,1)">{grid}{bars}</g>{labels}
 </svg>'''
 
