@@ -258,7 +258,7 @@ async def dashboard():
         rows += f"<td><a class='pr-link' href='https://github.com/{r['repo']}/pull/{r['pr_number']}' target='_blank'>#{r['pr_number']}</a></td>"
         rows += f"<td><div class='preview'>{preview}</div></td>"
         rows += f"<td><span class='badge'>{r['suggestions_count']}</span></td>"
-        rows += f"<td>{r['created_at'][:10]}</td></tr>"
+        rows += f"<td>{r['created_at'][:16]}</td></tr>"
 
     if not rows:
         rows = "<tr><td colspan='5' style='text-align:center;color:#484f58;padding:2rem;'>Aucune review pour l'instant. Configure le webhook GitHub.</td></tr>"
