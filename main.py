@@ -183,7 +183,12 @@ tr:hover td{background:#1c2128;}
 .detail-btn:hover{text-decoration:underline;}
 details.review-details{background:#161b22;border:1px solid #30363d;border-radius:6px;margin:0.5rem 0;padding:0.5rem 1rem;}
 details.review-details summary{cursor:pointer;color:#c9d1d9;padding:0.3rem 0;}
-details.review-details .body{color:#c9d1d9;font-size:0.85rem;line-height:1.5;padding:0.5rem 0;white-space:pre-wrap;}
+details.review-details .body{color:#c9d1d9;font-size:0.85rem;line-height:1.5;padding:0.5rem 0;max-width:100%;}
+details.review-details .body pre{overflow-x:auto;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:0.75rem;max-height:400px;}
+details.review-details .body code{font-family:'SFMono-Regular',Consolas,monospace;font-size:0.85rem;}
+details.review-details .body details{background:#0d1117;border:1px solid #30363d;border-radius:6px;margin:0.5rem 0;padding:0.5rem 0.75rem;}
+details.review-details .body details summary{cursor:pointer;color:#58a6ff;font-weight:600;}
+details.review-details .body table{display:block;overflow-x:auto;max-width:100%;}
 .timeline{display:flex;align-items:end;gap:2px;height:100px;padding:0.5rem 0;margin-bottom:1.5rem;}
 .timeline-bar{flex:1;background:#1f6feb;border-radius:2px 2px 0 0;min-width:4px;position:relative;transition:background 0.2s;}
 .timeline-bar:hover{background:#58a6ff;}
@@ -296,7 +301,8 @@ async def repo_detail(repo: str):
             body = bleach.clean(raw,
                 tags=["p","h1","h2","h3","h4","h5","h6","ul","ol","li",
                       "pre","code","strong","em","a","blockquote","hr","br",
-                      "table","thead","tbody","tr","th","td","div","span"],
+                      "table","thead","tbody","tr","th","td","div","span",
+                      "details","summary"],
                 attributes={"a": ["href","target"]})
             date = r["created_at"][:10]
             reviews_html += f"""
