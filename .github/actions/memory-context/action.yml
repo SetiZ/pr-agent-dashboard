@@ -29,16 +29,12 @@ runs:
         FILES: ${{ inputs.files }}
       run: |
         CONTEXT=$(python3 -c "
-import os, urllib.parse, urllib.request, json
-params = urllib.parse.urlencode({
-    'repo': os.environ['REPO'],
-    'pr': os.environ['PR_NUMBER'],
-    'files': os.environ['FILES']
-})
-url = os.environ['DASHBOARD_URL'].rstrip('/') + '/memory?' + params
-response = urllib.request.urlopen(url)
-print(json.load(response).get('context', ''))
-")
+        import os, urllib.parse, urllib.request, json
+        params = urllib.parse.urlencode({'repo': os.environ['REPO'], 'pr': os.environ['PR_NUMBER'], 'files': os.environ['FILES']})
+        url = os.environ['DASHBOARD_URL'].rstrip('/') + '/memory?' + params
+        response = urllib.request.urlopen(url)
+        print(json.load(response).get('context', ''))
+        ")
         echo "context<<EOF" >> $GITHUB_OUTPUT
         echo "$CONTEXT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
