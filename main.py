@@ -189,6 +189,15 @@ details.review-details .body code{font-family:'SFMono-Regular',Consolas,monospac
 details.review-details .body details{background:#0d1117;border:1px solid #30363d;border-radius:6px;margin:0.5rem 0;padding:0.5rem 0.75rem;}
 details.review-details .body details summary{cursor:pointer;color:#58a6ff;font-weight:600;}
 details.review-details .body table{display:block;overflow-x:auto;max-width:100%;}
+details.review-details .body .highlight{background:#272822;border-radius:6px;padding:0.75rem;overflow-x:auto;}
+details.review-details .body .highlight .c{color:#959077}
+details.review-details .body .highlight .k{color:#66D9EF}
+details.review-details .body .highlight .s{color:#E6DB74}
+details.review-details .body .highlight .o{color:#FF4689}
+details.review-details .body .highlight .mi{color:#AE81FF}
+details.review-details .body .highlight .nf{color:#A6E22E}
+details.review-details .body .highlight .nt{color:#FF4689}
+details.review-details .body .highlight .na{color:#A6E22E}
 .timeline{display:flex;align-items:end;gap:2px;height:100px;padding:0.5rem 0;margin-bottom:1.5rem;}
 .timeline-bar{flex:1;background:#1f6feb;border-radius:2px 2px 0 0;min-width:4px;position:relative;transition:background 0.2s;}
 .timeline-bar:hover{background:#58a6ff;}
