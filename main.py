@@ -169,7 +169,7 @@ class _HighlightRenderer(mistune.HTMLRenderer):
         return f"<pre><code>{html.escape(code)}</code></pre>"
 
 
-mistune_md = mistune.create_markdown(renderer=_HighlightRenderer(), escape=False)
+mistune_md = mistune.create_markdown(renderer=_HighlightRenderer(escape=False))
 
 STYLES = """
 <style>
