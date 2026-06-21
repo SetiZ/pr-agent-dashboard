@@ -182,7 +182,7 @@ h3{color:#f0f6fc;margin:1rem 0 0.5rem;font-size:1.1rem;}
 .stat-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.2rem;text-align:center;}
 .stat-value{font-size:2rem;font-weight:700;color:#58a6ff;}
 .stat-label{font-size:0.85rem;color:#8b949e;margin-top:0.3rem;}
-table{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;}
 th{background:#1c2128;padding:0.75rem 1rem;text-align:left;font-size:0.8rem;text-transform:uppercase;color:#8b949e;border-bottom:1px solid #30363d;}
 td{padding:0.75rem 1rem;border-bottom:1px solid #21262d;font-size:0.9rem;}
 tr:hover td{background:#1c2128;}
@@ -217,6 +217,26 @@ details.review-details .body .highlight{background:#272822;border-radius:6px;pad
 .timeline-empty{color:#484f58;text-align:center;padding:1rem;}
 .section-label{display:flex;align-items:center;gap:0.5rem;margin:1.5rem 0 0.75rem;}
 .section-label .count{color:#8b949e;font-size:0.85rem;}
+@media(max-width:640px){
+body{padding:1rem;}
+h1{font-size:1.4rem;}
+table{font-size:0.8rem;}
+th,td{padding:0.5rem;}
+.preview{display:none;}
+th:nth-child(3),td:nth-child(3){display:none;}
+th:nth-child(4),td:nth-child(4){display:none;}
+.repo-link{font-size:0.8rem;}
+.badge{font-size:0.65rem;}
+.detail-btn{font-size:0.75rem;}
+.stats-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;}
+.stat-card{padding:0.75rem;}
+.stat-value{font-size:1.5rem;}
+.stat-label{font-size:0.75rem;}
+.footer{font-size:0.7rem;}
+details.review-details{padding:0.4rem 0.6rem;}
+details.review-details summary{font-size:0.8rem;}
+.back-link{font-size:0.8rem;}
+}
 </style>
 """
 
@@ -272,7 +292,7 @@ async def dashboard():
         timeline_bars = "<div class='timeline-empty'>Aucune review ces 30 derniers jours</div>"
 
     return HTMLResponse(f"""<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><title>PR-Agent Dashboard</title>{FULL_STYLES}</head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR-Agent Dashboard</title>{FULL_STYLES}</head>
 <body>
 <h1>📊 PR-Agent Dashboard</h1>
 <div class="stats-grid">
@@ -288,7 +308,7 @@ async def dashboard():
 <h2>📂 Dépôts actifs</h2>
 <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem;">{repo_cards}</div>
 <h2>Dernières reviews</h2>
-<table><thead><tr><th>Repo</th><th>PR</th><th>Aperçu</th><th>Suggestions</th><th>Date</th></tr></thead><tbody>{rows}</tbody></table>
+<div style="overflow-x:auto"><table><thead><tr><th>Repo</th><th>PR</th><th>Aperçu</th><th>Suggestions</th><th>Date</th></tr></thead><tbody>{rows}</tbody></table></div>
 <div class="footer">PR-Agent Dashboard v0.1 · <a href="/docs" style="color:#58a6ff;">API docs</a></div>
 </body></html>""")
 
@@ -363,7 +383,7 @@ async def repo_detail(repo: str):
         sections = "<p style='color:#8b949e;text-align:center;padding:3rem;'>Aucun PR suivi pour ce dépôt.</p>"
 
     return HTMLResponse(f"""<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><title>{repo} — PR-Agent Dashboard</title>{FULL_STYLES}</head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{repo} — PR-Agent Dashboard</title>{FULL_STYLES}</head>
 <body>
 <a class="back-link" href="/">← Retour au dashboard</a>
 <h1>📂 {repo}</h1>
