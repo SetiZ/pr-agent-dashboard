@@ -297,7 +297,8 @@ async def repo_detail(repo: str):
         state_class = {"open": "state-open", "merged": "state-merged", "closed": "state-closed"}
         reviews_html = ""
         for r in pr["reviews"]:
-            raw = markdown.markdown(r["body"], extensions=["fenced_code", "codehilite"])
+            body = r["body"].replace("</details>\n<details", "</details>\n\n<details")
+            raw = markdown.markdown(body, extensions=["fenced_code", "codehilite"])
             body = bleach.clean(raw,
                 tags=["p","h1","h2","h3","h4","h5","h6","ul","ol","li",
                       "pre","code","strong","em","a","blockquote","hr","br",
