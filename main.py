@@ -235,10 +235,11 @@ async def dashboard():
     repo_cards = ""
     if repos:
         for repo_info in repos:
+            repo_name = bleach.clean(repo_info['repo'])
             repo_cards += f"""
-            <a href='/repo/{repo_info['repo']}' style='text-decoration:none;'>
+            <a href='/repo/{repo_name}' style='text-decoration:none;'>
             <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;'>
-                <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo_info['repo']}</span>
+                <span style='color:#58a6ff;font-weight:600;flex:1;'>{repo_name}</span>
                 <span class='badge'>{repo_info['pr_count']} PRs</span>
                 <span class='badge'>{repo_info['review_count']} reviews</span>
             </div>
